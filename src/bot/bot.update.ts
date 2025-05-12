@@ -1,21 +1,19 @@
-import {
-  Action,
-  Command,
-  Ctx,
-  Hears,
-  On,
-  Start,
-  Update,
-} from 'nestjs-telegraf';
+import { Action, Ctx, Hears, Start, Update } from 'nestjs-telegraf';
 import { Context, Markup } from 'telegraf';
 import { SessionMeeting } from './bot.session';
+import { plainToInstance } from 'class-transformer';
+import { InjectModel } from '@nestjs/mongoose';
+import { Bot } from './entities/bot.entity';
+import { Model } from 'mongoose';
+import { NameDto, validateAndReply } from './dto/create-bot.dto';
 
-type BotContext = Context & {
+export type BotContext = Context & {
   session: SessionMeeting;
 };
 
 @Update()
 export class BotUpdate {
+  constructor(@InjectModel(Bot.name) private botModel: Model<Bot>) {}
   @Start()
   async start(@Ctx() ctx: Context) {
     await ctx.replyWithPhoto(
@@ -38,7 +36,8 @@ export class BotUpdate {
   async saveName(@Ctx() ctx: BotContext) {
     ctx.session.step = 'WAITING_FOR_NAME';
     await ctx.reply(
-      "Yangi uchrashuv jarayani boshlandi. Iltimos, to'liq ismingizni kiriting, misol uchun: Kimdir Kimdir:",
+      "Yangi uchrashuv jarayani boshlandi.<b> Iltimos, to'liq ismingizni kiriting, misol uchun </b>: Kimdir Kimdir:",
+      { parse_mode: 'HTML' },
     );
   }
   @Hears(/.*/)
@@ -54,9 +53,16 @@ export class BotUpdate {
             return;
           }
           ctx.session.name = text;
+          console.log(text);
+          const validate = await validateAndReply(
+            NameDto,
+            { fullName: text },
+            ctx,
+          );
+          if (!validate) return;
           ctx.session.step = 'WAITING_FOR_ADDRESS';
           ctx.reply(
-            "📍 Uchrashuv bo'lib o'tadigan manzilni kiriting, misol uchun: Toshkent, chilanzar 5",
+            "📍 Uchrashuv bo'lib o'tadigan manzilni kiriting, misol uchun</b>: Toshkent, chilanzar 5",
           );
           return;
         case 'WAITING_FOR_ADDRESS':
@@ -95,7 +101,6 @@ export class BotUpdate {
           ) {
             ctx.reply(
               '⛔️ xato manzil kiritildi menudan tanlang!',
-
               Markup.keyboard([
                 'Dushanba',
                 'Seshanba',
@@ -121,7 +126,7 @@ export class BotUpdate {
                 ],
               },
             },
-            // could have deleted that but this is gonna stay here as a reminder for the next projects!
+            // could have deleted that but this is gonna stay here as a reminder for the next
             // Markup.inlineKeyboard([
             //   [{ text: '➕ Yana qo‘shish', callback_data: 'new_meeting' }],
             //   [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],

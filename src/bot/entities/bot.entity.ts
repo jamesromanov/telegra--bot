@@ -9,6 +9,10 @@ export class Bot {
   @Prop()
   chatId: number;
   @Prop()
+  time: string;
+  @Prop()
+  weekday: string;
+  @Prop()
   createdAt: Date;
 }
 
