@@ -3,11 +3,11 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 @Schema()
 export class Bot {
   @Prop()
-  fullname: string;
+  fullName: string;
   @Prop()
   address: string;
   @Prop()
-  chatId: number;
+  userId: number;
   @Prop()
   time: string;
   @Prop()

@@ -1,11 +1,18 @@
-import { Action, Ctx, Hears, Start, Update } from 'nestjs-telegraf';
+import { Action, Ctx, Hears, On, Start, Update } from 'nestjs-telegraf';
 import { Context, Markup } from 'telegraf';
 import { SessionMeeting } from './bot.session';
-import { plainToInstance } from 'class-transformer';
 import { InjectModel } from '@nestjs/mongoose';
 import { Bot } from './entities/bot.entity';
 import { Model } from 'mongoose';
-import { NameDto, validateAndReply } from './dto/create-bot.dto';
+import {
+  AddressDto,
+  NameDto,
+  TimeDto,
+  validateAndReply,
+  WeekdayDto,
+} from './dto/create-bot.dto';
+import { BadGatewayException } from '@nestjs/common';
+import { showPagination } from './show.pagination';
 
 export type BotContext = Context & {
   session: SessionMeeting;
@@ -32,12 +39,77 @@ export class BotUpdate {
         .resize(),
     );
   }
+  @Hears('📞 Bog‘lanish')
+  async contact(@Ctx() ctx: BotContext) {
+    // ctx.session.step = 'WAITING_FOR_CONTACT';
+    await ctx.reply(
+      'Boglanish uchun telefon raqamingizni qoldiring!',
+      Markup.keyboard([Markup.button.contactRequest('Contact ulashish!')])
+        .oneTime()
+        .resize(),
+    );
+  }
+  @On('contact')
+  async receiveContent(@Ctx() ctx: BotContext) {
+    const { contact } = { ...ctx?.message } as any;
+    if (!contact) return;
+    if (!process.env.ADMIN) throw new Error('Couldnt load env variables!');
+    await ctx.telegram.sendMessage(
+      process.env.ADMIN,
+      `👤 Ismi: ${contact.first_name}
+📞 Raqami: ${contact.phone_number}`,
+    );
+    await ctx.reply(
+      '✅Sizning raqamingiz muvaffaqyatli yuborildi',
+      Markup.removeKeyboard(),
+    );
+  }
+  @Hears('🗓 Uchrashuvlarim')
+  async showMeetings(@Ctx() ctx: BotContext) {
+    const userId = ctx.from?.id;
+    const meetings = await this.botModel.find({ userId });
+    console.log(meetings);
+
+    if (!meetings || meetings.length === 0)
+      return ctx.reply('🗓 Sizda hech qanday uchrashuvlar mavjud emas!');
+
+    ctx.session.meetingsPage = 0;
+    ctx.session.meetings = meetings;
+
+    return showPagination(ctx);
+  }
+  @Action(['preview', 'next'])
+  async pagination(@Ctx() ctx: BotContext) {
+    if (ctx.session.meetings?.length) {
+      await ctx.answerCbQuery();
+
+      const current = ctx.session.meetingsPage || 0;
+      if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+        const action = ctx.callbackQuery?.data;
+
+        if (action === 'preview') {
+          ctx.session.meetingsPage = current - 1;
+        }
+        if (action === 'next') {
+          ctx.session.meetingsPage = current + 1;
+        }
+        return showPagination(ctx);
+      }
+    }
+  }
   @Hears('📅 Yangi uchrashuv')
   async saveName(@Ctx() ctx: BotContext) {
     ctx.session.step = 'WAITING_FOR_NAME';
     await ctx.reply(
-      "Yangi uchrashuv jarayani boshlandi.<b> Iltimos, to'liq ismingizni kiriting, misol uchun </b>: Kimdir Kimdir:",
-      { parse_mode: 'HTML' },
+      "Yangi uchrashuv jarayani boshlandi.\n<b> 👤 Iltimos,to'liq ismingizni kiriting, misol uchun </b>: Kimdir Kimdir:",
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],
+          ],
+        },
+      },
     );
   }
   @Hears(/.*/)
@@ -49,36 +121,87 @@ export class BotUpdate {
           if (!text || text.length < 5 || text.split(' ').length < 2) {
             ctx.reply(
               "⛔️ Ism juda qisqa. Iltimos, to'liq ismingizni kiriting!",
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],
+                  ],
+                },
+              },
             );
             return;
           }
-          ctx.session.name = text;
-          console.log(text);
-          const validate = await validateAndReply(
+          const validateName = await validateAndReply(
             NameDto,
             { fullName: text },
             ctx,
           );
-          if (!validate) return;
+          if (!validateName) return;
+          ctx.session.name = text;
           ctx.session.step = 'WAITING_FOR_ADDRESS';
           ctx.reply(
-            "📍 Uchrashuv bo'lib o'tadigan manzilni kiriting, misol uchun</b>: Toshkent, chilanzar 5",
+            "📍 Uchrashuv bo'lib o'tadigan manzilni kiriting, <b>misol uchun</b>: Toshkent, chilanzar 5",
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],
+                ],
+              },
+            },
           );
           return;
+
         case 'WAITING_FOR_ADDRESS':
           if (!text || text.length < 5)
-            return "⛔️ Manzil juda qisqa. Iltimos, to'liq manzilni kiriting!";
+            return ctx.reply(
+              "⛔️ Manzil juda qisqa. Iltimos, to'liq manzilni kiriting!",
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],
+                  ],
+                },
+              },
+            );
+          const validateAddress = await validateAndReply(
+            AddressDto,
+            { address: text },
+            ctx,
+          );
+          if (!validateAddress) return;
           ctx.session.address = text;
-          ctx.session.step = 'WAITING_FOR_HOUR';
-          await ctx.reply('⏳ Vaqtni kiriting:');
+          ctx.session.step = 'WAITING_FOR_TIME';
+          await ctx.reply('⏳ Vaqtni kiriting <b>Misol uchun</b>: 12:00', {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],
+              ],
+            },
+          });
           return;
-        case 'WAITING_FOR_HOUR':
+
+        case 'WAITING_FOR_TIME':
           if (!text || text.length < 5 || text.length > 5) {
             ctx.reply(
               '⛔️ Xato vatq kiritildi!. Iltimos vaqt 00:00 formatida bolsin!',
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: '❌ Bekor qilish', callback_data: 'cancel' }],
+                  ],
+                },
+              },
             );
             return;
           }
+          const timeValidator = await validateAndReply(
+            TimeDto,
+            { time: text },
+            ctx,
+          );
+          if (!timeValidator) return;
           ctx.session.step = 'WAITING_FOR_WEEKDAY';
           ctx.session.time = text;
           await ctx.reply(
@@ -87,36 +210,51 @@ export class BotUpdate {
               'Dushanba',
               'Seshanba',
               'Chorshanba',
+              'Payshanba',
               'Juma',
               'Shanba',
             ]).oneTime(),
           );
           return;
+
         case 'WAITING_FOR_WEEKDAY':
           if (
             !text ||
-            !['Dushanba', 'Seshanba', 'Chorshanba', 'Juma', 'Shanba'].includes(
-              text,
-            )
+            ![
+              'Dushanba',
+              'Seshanba',
+              'Chorshanba',
+              'Payshanba',
+              'Juma',
+              'Shanba',
+            ].includes(text)
           ) {
             ctx.reply(
-              '⛔️ xato manzil kiritildi menudan tanlang!',
+              '⛔️ xato hafta kuni kiritildi menudan tanlang!',
               Markup.keyboard([
                 'Dushanba',
                 'Seshanba',
                 'Chorshanba',
+                'Payshanba',
                 'Juma',
                 'Shanba',
               ]).oneTime(),
             );
             return;
           }
+          const validateWeekday = await validateAndReply(
+            WeekdayDto,
+            { weekday: text },
+            ctx,
+          );
+          if (!validateWeekday) return;
           ctx.session.step = 'DONE';
           ctx.session.weekday = text;
           ctx.reply(
             `✅ Yangi uchrashuv saqlandi:\n\n 👤 Ism: ${ctx.session.name}\n 📍Manzil: ${ctx.session.address}\n 📅Hafta kuni: ${ctx.session.weekday}\n ⏳Soat: ${ctx.session.time} `,
             {
               reply_markup: {
+                remove_keyboard: true,
                 inline_keyboard: [
                   [
                     { text: '➕ Yana qo‘shish', callback_data: 'new_meeting' },
@@ -134,9 +272,11 @@ export class BotUpdate {
             // ]),
           );
           return;
-
         default:
-          ctx.reply('Iltimos /start yoki 📅 Yangi uchrashuv tugmasini bosing!');
+          ctx.reply(
+            'Iltimos /start yoki <b>📅 Yangi uchrashuv</b> tugmasini bosing!',
+            { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
+          );
           return;
       }
     }
@@ -154,12 +294,42 @@ export class BotUpdate {
     ctx.session = {};
     await ctx.answerCbQuery();
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.reply('❌ Uchrashuv bekor qilindi!');
+    await ctx.reply('❌ Uchrashuv bekor qilindi!', {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📅 Yangi uchrashuv', callback_data: 'new_meeting' }],
+        ],
+      },
+    });
   }
   @Action('confirm')
   async confirmMeeting(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+    try {
+      await this.botModel.create({
+        fullName: ctx.session.name,
+        ...ctx.session,
+        userId: ctx.from?.id,
+      });
+    } catch (error) {
+      await ctx.reply(
+        '❌ Uchrashuv saqlanishda hatolik iltimos qaytadan urining!',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📅 Yangi uchrashuv', callback_data: 'new_meeting' }],
+            ],
+          },
+        },
+      );
+    }
     await ctx.reply('✅ Uchrashuv muvaffaqiyatli saqlandi!');
+    if (!process.env.ADMIN)
+      throw new BadGatewayException('Couldnt load the env variable admin!');
+    await ctx.telegram.sendMessage(
+      process.env.ADMIN,
+      `✅ Yangi uchrashuv qoshilishi aniqlandi:\n\n 👤 Ism: ${ctx.session.name}\n 📍Manzil: ${ctx.session.address}\n 📅Hafta kuni: ${ctx.session.weekday}\n ⏳Soat: ${ctx.session.time} `,
+    );
   }
 }

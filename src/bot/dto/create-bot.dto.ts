@@ -1,6 +1,7 @@
-import { IsString, Length, Matches, validate } from 'class-validator';
+import { IsEnum, IsString, Length, Matches, validate } from 'class-validator';
 import { BotContext } from '../bot.update';
 import { plainToInstance } from 'class-transformer';
+import { Weekdays } from '../weekday.enum';
 
 export class NameDto {
   @IsString()
@@ -27,7 +28,8 @@ export class TimeDto {
 }
 export class WeekdayDto {
   @IsString()
-  weekday: string;
+  @IsEnum(Weekdays)
+  weekday: WeekdayDto;
 }
 
 export async function validateAndReply<T extends object>(
