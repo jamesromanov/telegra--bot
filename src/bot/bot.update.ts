@@ -231,6 +231,7 @@ export class BotUpdate {
           ) {
             ctx.reply(
               '⛔️ xato hafta kuni kiritildi menudan tanlang!',
+
               Markup.keyboard([
                 'Dushanba',
                 'Seshanba',
@@ -250,14 +251,20 @@ export class BotUpdate {
           if (!validateWeekday) return;
           ctx.session.step = 'DONE';
           ctx.session.weekday = text;
+          await ctx.reply(
+            '✅ Yangi uchrashuv saqlandi:',
+            Markup.removeKeyboard(),
+          );
           ctx.reply(
-            `✅ Yangi uchrashuv saqlandi:\n\n 👤 Ism: ${ctx.session.name}\n 📍Manzil: ${ctx.session.address}\n 📅Hafta kuni: ${ctx.session.weekday}\n ⏳Soat: ${ctx.session.time} `,
+            `👤 Ism: ${ctx.session.name}\n 📍Manzil: ${ctx.session.address}\n 📅Hafta kuni: ${ctx.session.weekday}\n ⏳Soat: ${ctx.session.time} `,
             {
               reply_markup: {
-                remove_keyboard: true,
                 inline_keyboard: [
                   [
-                    { text: '➕ Yana qo‘shish', callback_data: 'new_meeting' },
+                    {
+                      text: '➕ Yana qo‘shish',
+                      callback_data: 'new_meeting',
+                    },
                     { text: '❌ Bekor qilish', callback_data: 'cancel' },
                     { text: '✅ Tasdiqlash', callback_data: 'confirm' },
                   ],
@@ -324,7 +331,10 @@ export class BotUpdate {
         },
       );
     }
-    await ctx.reply('✅ Uchrashuv muvaffaqiyatli saqlandi!');
+    await ctx.reply(
+      '✅ Uchrashuv muvaffaqiyatli saqlandi!',
+      Markup.removeKeyboard(),
+    );
     if (!process.env.ADMIN)
       throw new BadGatewayException('Couldnt load the env variable admin!');
     await ctx.telegram.sendMessage(
