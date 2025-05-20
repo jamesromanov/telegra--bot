@@ -153,8 +153,8 @@ export class BotUpdate {
           return;
 
         case 'WAITING_FOR_ADDRESS':
-          if (!text || text.length < 5)
-            return ctx.reply(
+          if (!text || text.length < 5) {
+            ctx.reply(
               "⛔️ Manzil juda qisqa. Iltimos, to'liq manzilni kiriting!",
               {
                 reply_markup: {
@@ -164,6 +164,8 @@ export class BotUpdate {
                 },
               },
             );
+            return;
+          }
           const validateAddress = await validateAndReply(
             AddressDto,
             { address: text },
