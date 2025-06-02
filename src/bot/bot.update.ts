@@ -68,10 +68,11 @@ export class BotUpdate {
   async showMeetings(@Ctx() ctx: BotContext) {
     const userId = ctx.from?.id;
     const meetings = await this.botModel.find({ userId });
-    console.log(meetings);
 
-    if (!meetings || meetings.length === 0)
-      return ctx.reply('🗓 Sizda hech qanday uchrashuvlar mavjud emas!');
+    if (!meetings || meetings.length === 0) {
+      ctx.reply('🗓 Sizda hech qanday uchrashuvlar mavjud emas!');
+      return;
+    }
 
     ctx.session.meetingsPage = 0;
     ctx.session.meetings = meetings;
