@@ -53,9 +53,9 @@ export class BotUpdate {
   async receiveContent(@Ctx() ctx: BotContext) {
     const { contact } = { ...ctx?.message } as any;
     if (!contact) return;
-    // if (!process.env.ADMIN) throw new Error('Couldnt load env variables!');
+    if (!process.env.ADMIN) throw new Error('Couldnt load env variables!');
     await ctx.telegram.sendMessage(
-      7206941245,
+      process.env.ADMIN,
       `👤 Ismi: ${contact.first_name}
 📞 Raqami: ${contact.phone_number}`,
     );
@@ -338,10 +338,10 @@ export class BotUpdate {
       '✅ Uchrashuv muvaffaqiyatli saqlandi!',
       Markup.removeKeyboard(),
     );
-    // if (!process.env.ADMIN)
-    //   throw new BadGatewayException('Couldnt load the env variable admin!');
+    if (!process.env.ADMIN)
+      throw new BadGatewayException('Couldnt load the env variable admin!');
     await ctx.telegram.sendMessage(
-      7206941245,
+      process.env.ADMIN,
       `✅ Yangi uchrashuv qoshilishi aniqlandi:\n\n 👤 Ism: ${ctx.session.name}\n 📍Manzil: ${ctx.session.address}\n 📅Hafta kuni: ${ctx.session.weekday}\n ⏳Soat: ${ctx.session.time} `,
     );
   }

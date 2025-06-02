@@ -25,11 +25,11 @@ import { BotModule } from './bot/bot.module';
     // }),
     TelegrafModule.forRoot({
       middlewares: [session()],
-      token: '7567233377:AAFmX0mZ-JcwslxaKpX4cmgll_HSR2ZF1rw',
-      // process.env.TELEGRAM_BOT_TOKEN ??
-      // (() => {
-      //   throw new Error('TELEGRAM_BOT_TOKEN is not set!');
-      // })(),
+      token:
+        process.env.TELEGRAM_BOT_TOKEN ??
+        (() => {
+          throw new Error('TELEGRAM_BOT_TOKEN is not set!');
+        })(),
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
