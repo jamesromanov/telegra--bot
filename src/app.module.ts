@@ -34,7 +34,7 @@ import { BotModule } from './bot/bot.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: 'mongodb://mongo:DydsNQnXYNyLrUzHgbDdMhfbeDhWMTEN@trolley.proxy.rlwy.net:30292',
+        uri: process.env.MONGO_URL,
       }),
       inject: [ConfigService],
     }),
